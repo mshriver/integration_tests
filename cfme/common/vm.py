@@ -387,6 +387,8 @@ class BaseVM(Pretty, Updateable, PolicyProfileAssignable, Taggable, SummaryMixin
         """
         if not self.on_details():
             logger.debug("load_details: not on details already")
+            if paginator.page_controls_exist():
+                paginator.results_per_page(1000)
             sel.click(self.find_quadicon())
         else:
             if refresh:
