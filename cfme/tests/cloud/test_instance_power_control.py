@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 import fauxfactory
-import cfme.web_ui.flash as flash
 import pytest
-from cfme.cloud.instance import (EC2Instance, Instance, OpenStackInstance,
-                                 AzureInstance, GCEInstance)
+
+import cfme.web_ui.flash as flash
 from cfme import test_requirements
+from cfme.cloud.instance import Instance
+from cfme.cloud.instance.openstack import OpenStackInstance
+from cfme.cloud.instance.ec2 import EC2Instance
+from cfme.cloud.instance.azure import AzureInstance
+from cfme.cloud.instance.gce import GCEInstance
 from utils import testgen, version
-from utils.log import logger
+from utils.appliance.implementations.ui import navigate_to
 from utils.generators import random_vm_name
+from utils.log import logger
 from utils.wait import wait_for, TimedOutError, RefreshTimer
 
 
@@ -51,9 +56,13 @@ def wait_for_state_change_time_refresh(instance, provider, state_change_time, ti
     """ Waits for 'State Changed On' refresh
     """
     def _wait_for_state_refresh():
-        instance.load_details()
-        return state_change_time != instance.get_detail(
-            properties=("Power Management", "State Changed On"))
+        try:
+            navigate_to(instance, 'Details')
+            return state_change_time != instance.get_detail(
+                properties=("Power Management", "State Changed On"))
+        except NameError:
+            logger.warning('NameError caught while waiting for state change, continuing')
+            return False
     refresh_timer = RefreshTimer(time_for_refresh=180)
     try:
         wait_for(_wait_for_state_refresh, fail_func=lambda: provider.is_refreshed(refresh_timer),
@@ -78,8 +87,7 @@ def wait_for_termination(provider, instance):
     wait_for_state_change_time_refresh(instance, provider, state_change_time, timeout=720)
     if instance.get_detail(('Power Management', 'Power State')) not in \
             {instance.STATE_TERMINATED, instance.STATE_ARCHIVED, instance.STATE_UNKNOWN}:
-        """Wait for one more state change as transitional state also
-        changes "State Changed On" time
+        """Wait for one more state change as transitional state also changes "State Changed On" time
         """
         logger.info("Instance is still powering down. please wait before termination")
         state_change_time = instance.get_detail(('Power Management', 'State Changed On'))
@@ -179,9 +187,7 @@ def test_quadicon_terminate(setup_provider_funcscope, provider, testing_instance
         desired_state=testing_instance.STATE_ON, timeout=720)
     testing_instance.power_control_from_cfme(option=testing_instance.TERMINATE, cancel=False)
     logger.info("Terminate initiated")
-    flash.assert_message_contain({
-        version.LOWEST: "Terminate initiated",
-        "5.5": "Vm Destroy initiated"})
+    flash.assert_message_contain('Vm Destroy initiated')
     soft_assert(wait_for_termination(provider, testing_instance), "Instance still exists")
 
 
@@ -359,9 +365,7 @@ def test_terminate(setup_provider_funcscope, provider, testing_instance, soft_as
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     testing_instance.power_control_from_cfme(
         option=testing_instance.TERMINATE, cancel=False, from_details=True)
-    flash.assert_message_contain({
-        version.LOWEST: "Terminate initiated",
-        "5.5": "Vm Destroy initiated"})
+    flash.assert_message_contain('Vm Destroy initiated')
     soft_assert(wait_for_termination(provider, testing_instance), "Instance still exists")
 
 
