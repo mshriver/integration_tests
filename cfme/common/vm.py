@@ -20,6 +20,7 @@ from utils.timeutil import parsetime
 from utils.update import Updateable
 from utils.virtual_machines import deploy_template
 from utils.wait import wait_for, TimedOutError
+from utils.appliance.implementations.ui import navigate_to
 
 from . import PolicyProfileAssignable, Taggable, SummaryMixin
 
@@ -323,9 +324,9 @@ class BaseVM(Pretty, Updateable, PolicyProfileAssignable, Taggable, SummaryMixin
                     # We don't use provider-specific page (vm_templates_provider_branch) here
                     # as those don't list archived/orphaned VMs
                     if self.is_vm:
-                        sel.force_navigate(self.provider.instances_page_name)
+                        navigate_to(self.provider, 'Instances')
                     else:
-                        sel.force_navigate(self.provider.templates_page_name)
+                        navigate_to(self.provider, self.provider.templates_destination_name)
                 search.normal_search(self.name)
             except Exception as e:
                 logger.warning("Failed to use search: %s", str(e))
