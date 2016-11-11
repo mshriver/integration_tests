@@ -123,6 +123,23 @@ class Instance(VM, Navigatable):
     def get_collection_via_rest(self):
         return rest_api().collections.instances
 
+    def wait_for_instance_state_change(self, desired_state, timeout=300):
+        """Wait for an instance to come to desired state.
+
+        This function waits just the needed amount of time thanks to wait_for.
+
+        Args:
+            desired_state: 'on' or 'off'
+            timeout: Specify amount of time (in seconds) to wait until TimedOutError is raised
+        """
+
+        def _looking_for_state_change():
+            self.load_details()
+            tb.refresh()
+            return self.get_detail(("Power Management", "Power State")) == desired_state
+
+        return wait_for(_looking_for_state_change, num_sec=timeout)
+
 
 ###
 # Multi-object functions
@@ -198,25 +215,6 @@ def remove(instance_names, cancel=True, provider_crud=None):
         version.LOWEST: 'Remove selected items from the VMDB',
         '5.7': 'Remove selected items'}), invokes_alert=True)
     sel.handle_alert(cancel=cancel)
-
-
-def wait_for_instance_state_change(vm_name, desired_state, timeout=300, provider_crud=None):
-    """Wait for an instance to come to desired state.
-
-    This function waits just the needed amount of time thanks to wait_for.
-
-    Args:
-        vm_name: Displayed name of the instance
-        desired_state: 'on' or 'off'
-        timeout: Specify amount of time (in seconds) to wait until TimedOutError is raised
-        provider_crud: provider object where instance resides (optional)
-    """
-    def _looking_for_state_change():
-        tb.refresh()
-        find_quadicon(vm_name, do_not_navigate=False).state == 'currentstate-' + desired_state
-
-    _method_setup(vm_name, provider_crud)
-    return wait_for(_looking_for_state_change, num_sec=timeout)
 
 
 def is_pwr_option_visible(vm_names, option, provider_crud=None):
@@ -355,7 +353,7 @@ class InstanceDetails(CFMENavigateStep):
                 {'Name': self.obj.name,
                  'Provider': self.obj.provider.name}))
             return
-        except NameError or TypeError:
+        except (NameError, TypeError):
             logger.warning('Exception caught, could not match instance with name and provider')
 
         # If name and provider weren't matched, look for just name
