@@ -299,6 +299,7 @@ class BaseVM(Pretty, Updateable, PolicyProfileAssignable, Taggable, SummaryMixin
         quadicon = Quadicon(self.name, self.quadicon_type)
         if not do_not_navigate:
             if from_any_provider:
+                # TODO implement as navigate_to when cfme.infra.virtual_machines has destination
                 sel.force_navigate(self.ALL_LIST_LOCATION)
             elif self.is_vm:
                 self.provider.load_all_provider_vms()
@@ -619,7 +620,8 @@ class VM(BaseVM):
             _looking_for_state_change,
             num_sec=timeout,
             delay=30,
-            fail_func=self.refresh_relationships if with_relationship_refresh else None)
+            fail_func=lambda: self.refresh_relationships(from_details=from_details) if
+            with_relationship_refresh else None)
 
     def is_pwr_option_available_in_cfme(self, option, from_details=False):
         """Checks to see if a power option is available on the VM
