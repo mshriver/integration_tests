@@ -300,14 +300,14 @@ def test_suspend(
     Metadata:
         test_flag: power_control, provision
     """
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     testing_instance.power_control_from_cfme(
         option=testing_instance.SUSPEND, cancel=False, from_details=True)
     flash.assert_message_contain("Suspend initiated")
     if provider.type == 'azure':
         provider.mgmt.wait_vm_suspended(testing_instance.name)
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_SUSPENDED, timeout=720, from_details=True)
     soft_assert(
         provider.mgmt.is_vm_suspended(testing_instance.name),
@@ -322,12 +322,12 @@ def test_unpause(
     Metadata:
         test_flag: power_control, provision
     """
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_PAUSED, timeout=720, from_details=True)
     testing_instance.power_control_from_cfme(
         option=testing_instance.START, cancel=False, from_details=True)
     flash.assert_message_contain("Start initiated")
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     soft_assert(
         provider.mgmt.is_vm_running(testing_instance.name),
@@ -342,12 +342,12 @@ def test_resume(setup_provider_funcscope, provider, testing_instance, soft_asser
     Metadata:
         test_flag: power_control, provision
     """
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_SUSPENDED, timeout=720, from_details=True)
     testing_instance.power_control_from_cfme(
         option=testing_instance.START, cancel=False, from_details=True)
     flash.assert_message_contain("Start initiated")
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     soft_assert(
         provider.mgmt.is_vm_running(testing_instance.name),
@@ -361,7 +361,7 @@ def test_terminate(setup_provider_funcscope, provider, testing_instance, soft_as
     Metadata:
         test_flag: power_control, provision
     """
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     testing_instance.power_control_from_cfme(
         option=testing_instance.TERMINATE, cancel=False, from_details=True)
@@ -374,7 +374,7 @@ def test_terminate(setup_provider_funcscope, provider, testing_instance, soft_as
 def test_terminate_via_rest(setup_provider_funcscope, provider, testing_instance, soft_assert,
         verify_vm_running, rest_api, from_detail):
     assert "terminate" in rest_api.collections.instances.action.all
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     vm = rest_api.collections.instances.get(name=testing_instance.name)
     if from_detail:
@@ -391,7 +391,7 @@ def test_power_options_from_on(setup_provider_funcscope, provider, testing_insta
     Metadata:
         test_flag: power_control
     """
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_ON, timeout=720, from_details=True)
     check_power_options(soft_assert, testing_instance, 'on')
 
@@ -403,6 +403,6 @@ def test_power_options_from_off(setup_provider_funcscope, provider, testing_inst
     Metadata:
         test_flag: power_control
     """
-    testing_instance.wait_for_vm_state_change(
+    testing_instance.wait_for_instance_state_change(
         desired_state=testing_instance.STATE_OFF, timeout=720, from_details=True)
     check_power_options(soft_assert, testing_instance, 'off')
