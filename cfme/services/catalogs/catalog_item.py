@@ -146,7 +146,7 @@ class CatalogItem(Updateable, Pretty, Navigatable):
         catalog = fakeobject_or_object(self.catalog, "name", "Unassigned")
         dialog = fakeobject_or_object(self.dialog, "name", "No Dialog")
         sel_provider = None
-        if self.item_type is not "Generic":
+        if self.item_type is not "Generic" and not isinstance(self.provider, (basestring, None)):
             if self.provider.type_tclass is not "infra":
                 sel_provider = self.provider
         fill(basic_info_form, {'name_text': self.name,
