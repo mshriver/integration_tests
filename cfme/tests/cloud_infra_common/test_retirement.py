@@ -10,10 +10,10 @@ from utils.generators import random_vm_name
 from utils.providers import setup_a_provider_by_class
 from utils.timeutil import parsetime
 from utils.wait import wait_for
-from utils.version import current_version
 
 pytestmark = [
     pytest.mark.usefixtures('uses_infra_providers', 'uses_cloud_providers'),
+    test_requirements.retirement,
     pytest.mark.tier(2)
 ]
 
@@ -65,11 +65,6 @@ def existing_vm(request, test_provider):
 
 
 def verify_retirement(vm):
-    # add condition because of differ behaviour between 5.5 and 5.6
-    if current_version() < "5.6":
-        wait_for(lambda: vm.exists is False, delay=30, num_sec=360,
-                 message="Wait for VM {} removed from provider".format(vm.name))
-    else:
         # wait for the info block showing a date as retired date
         wait_for(lambda: vm.is_retired, delay=30, num_sec=720,
                  message="Wait until VM {} will be retired".format(vm.name))
@@ -82,8 +77,6 @@ def verify_retirement(vm):
         assert retirement_date == today
 
 
-@test_requirements.retirement
-@pytest.mark.meta(blockers=[1337697])
 def test_retirement_now(vm):
     """Tests retirement
 
@@ -94,7 +87,6 @@ def test_retirement_now(vm):
     verify_retirement(vm)
 
 
-@test_requirements.retirement
 def test_set_retirement_date(vm):
     """Tests retirement
 
@@ -105,7 +97,6 @@ def test_set_retirement_date(vm):
     verify_retirement(vm)
 
 
-@test_requirements.retirement
 def test_set_unset_retirement_date_tomorrow(existing_vm):
     """Tests retirement
 
