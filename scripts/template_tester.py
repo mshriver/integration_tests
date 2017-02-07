@@ -15,15 +15,23 @@ import os
 import sys
 
 from utils import trackerbot
+from utils.log import logger
 
 
 def get(api, request_type=None):
     try:
-        template, provider_key, stream, provider_type =\
-            trackerbot.templates_to_test(api, request_type=request_type, limit=1)[0]
+        templates = trackerbot.templates_to_test(api, request_type=request_type, limit=1)
+        logger.info('Fetched templates from provider: {}'.format(templates))
+
+        template, provider_key, stream, provider_type = templates[0]
     except (IndexError, TypeError):
         # No untested provider templates, all is well
+        logger.warning('No untested provider templates, exiting')
         return 0
+
+    logger.info('Template envars: ')
+    logger.info(['{}: {}'.format(v.__name__, v)
+                for v in [template, provider_key, stream, provider_type]])
 
     # Print envvar exports to be eval'd
     export(
@@ -38,12 +46,16 @@ def latest(api, stream, provider_key=None):
     try:
         if provider_key:
             prov = api.provider(provider_key).get()
+            logger.info('set provider api')
             res = prov['latest_templates'][stream]
         else:
+            logger.info('alternate res set')
             res = api.group(stream).get()
     except IndexError:
         # No templates in stream
         return 1
+
+    logger.info('res: {}'.format(res))
 
     export(
         appliance_template=res['latest_template'],
