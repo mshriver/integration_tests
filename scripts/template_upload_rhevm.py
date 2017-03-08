@@ -623,8 +623,9 @@ def upload_template(rhevip, sshname, sshpass, username, password,
             print("RHEVM:{} The script will now end.".format(provider))
             ssh_client.close()
         else:
-            print("RHEVM:{} Downloading .ova file...".format(provider))
+            print("RHEVM:{} Downloading .ova file: {}".format(provider, kwargs.get('image_url')))
             download_ova(ssh_client, kwargs.get('image_url'))
+            print("RHEVM: {} .ova file downloaded".format(provider))
             try:
                 print("RHEVM:{} Templatizing .ova file...".format(provider))
                 template_from_ova(api, username, password, rhevip, kwargs.get('edomain'),
