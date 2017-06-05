@@ -85,7 +85,7 @@ def main(**kwargs):
     # get_mgmt validates, since it will explode without an existing key or type
     if kwargs.get('deploy'):
         kwargs['configure'] = True
-        kwargs['outfile'] = 'appliance_ip_address_1'
+        kwargs['outfile'] = kwargs.get('outfile') or 'appliance_ip_address_1'
         provider_data = utils.conf.provider_data
         providers = provider_data['management_systems']
         provider_dict = provider_data['management_systems'][kwargs['provider']]
