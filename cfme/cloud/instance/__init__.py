@@ -331,6 +331,13 @@ class Instance(VM, Navigatable):
         Args:
         Returns: :py:class:`cfme.web_ui.Quadicon` instance
         """
+        def check_quad(quadicon, mark):
+            if quadicon.exists:
+                if mark:
+                    sel.check(quadicon.checkbox())
+                return True
+            else:
+                return False
         # TODO refactor a bit when quadicon is widget
         if not kwargs.get('do_not_navigate', False):
             navigate_to(self, 'All')
@@ -338,14 +345,17 @@ class Instance(VM, Navigatable):
         # Make sure we're looking at the quad grid
         view = self.browser.create_view(InstanceAllView)
         view.toolbar.view_selector.select('Grid View')
-        for _ in view.paginator.pages():
-            quadicon = Quadicon(self.name, "instance")
-            if quadicon.exists:
-                if kwargs.get('mark', False):
-                    sel.check(quadicon.checkbox())
-                return quadicon
+        quadicon = Quadicon(self.name, "instance")
+        if view.paginator.exists:
+            for _ in view.paginator.pages():
+                if check_quad(quadicon, kwargs.get('mark', False)):
+                    return quadicon
         else:
-            raise InstanceNotFound("Instance '{}' not found in UI!".format(self.name))
+            if check_quad(quadicon, kwargs.get('mark', False)):
+                return quadicon
+
+        # We never found a quadicon, raise exception
+        raise InstanceNotFound("Instance '{}' not found in UI!".format(self.name))
 
     def power_control_from_cfme(self, *args, **kwargs):
         """Power controls a VM from within CFME using details or collection
