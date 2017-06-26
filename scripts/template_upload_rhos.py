@@ -207,7 +207,7 @@ def upload_template(rhosip, sshname, sshpass, username, password, auth_url, prov
                 wait_for(check_image_status, [image_id, export, ssh_client],
                          fail_condition=False, delay=5, num_sec=300)
                 print("RHOS:{} Successfully uploaded the template.".format(provider))
-                if not provider_data:
+                if not provider_data and stream:
                     print("RHOS:{} Adding template {} to trackerbot...".format(provider,
                                                                                template_name))
                     trackerbot.trackerbot_add_provider_template(stream, provider, template_name)
@@ -232,11 +232,14 @@ def run(**kwargs):
 
     thread_queue = []
     providers = list_provider_keys("openstack")
-    if kwargs['provider_data']:
+    if kwargs.get('provider_data'):
         provider_data = kwargs['provider_data']
         mgmt_sys = providers = provider_data['management_systems']
     for provider in providers:
-        if kwargs['provider_data']:
+        if provider != kwargs.get('provider'):
+            # provider key was provided, only upload for that one
+            continue
+        if kwargs.get('provider_data'):
             if mgmt_sys[provider]['type'] != 'openstack':
                 continue
             username = mgmt_sys[provider]['username']
@@ -262,7 +265,7 @@ def run(**kwargs):
         thread = Thread(target=upload_template,
                         args=(rhosip, sshname, sshpass, username, password, auth_url, provider,
                               kwargs.get('image_url'), kwargs.get('template_name'),
-                              kwargs['provider_data'], kwargs['stream']))
+                              kwargs.get('provider_data'), kwargs.get('stream')))
         thread.daemon = True
         thread_queue.append(thread)
         thread.start()
@@ -274,7 +277,7 @@ def run(**kwargs):
 if __name__ == '__main__':
     args = parse_cmd_line()
 
-    kwargs = cfme_data['template_upload']['template_upload_rhos']
+    kwargs = cfme_data['template_upload'].get('template_upload_rhos') or {}
 
     final_kwargs = make_kwargs(args, **kwargs)
 
