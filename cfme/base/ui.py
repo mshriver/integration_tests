@@ -139,7 +139,7 @@ def logged_in(self):
     return self.appliance.browser.create_view(BaseLoggedInPage).logged_in
 
 
-LOGIN_METHODS = ['click_on_login', 'press_enter_after_password', '_js_auth_fn']
+LOGIN_METHODS = ['click_on_login', 'press_enter_after_password']  # , '_js_auth_fn']
 
 
 @Server.login.external_implementation_for(ViaUI)
