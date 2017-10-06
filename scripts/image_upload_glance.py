@@ -62,14 +62,11 @@ def main():
     parser.add_argument('--image', help='Image to be uploaded to Glance')
     parser.add_argument('--image_name_in_glance', help='Image name in Glance')
     parser.add_argument('--provider', help='Glance provider key in cfme_data')
-    parser.add_argument('--disk_format', help='Disk format of image')
+    parser.add_argument('--disk_format', help='Disk format of image', default='qcow2')
 
     args = parser.parse_args()
 
-    if args.disk_format is None:
-        upload_to_glance(args.image, args.image_name_in_glance, args.provider, 'qcow2')
-    else:
-        upload_to_glance(args.image, args.image_name_in_glance, args.provider, args.disk_format)
+    upload_to_glance(args.image, args.image_name_in_glance, args.provider, args.disk_format)
 
 
 if __name__ == "__main__":
