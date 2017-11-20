@@ -11,6 +11,7 @@ from widgetastic_patternfly import Dropdown, Tab, FlashMessages
 from cfme import web_ui as ui
 from cfme.base.login import BaseLoggedInPage
 from cfme.web_ui import toolbar as tb
+from cfme.exceptions import DestinationNotFound
 import cfme.fixtures.pytest_selenium as sel
 from cfme.web_ui import Form, Region, CheckboxTable, fill
 from cfme.utils.appliance import Navigatable
@@ -165,6 +166,44 @@ def wait_analysis_finished(task_name, task_type, delay=5, timeout='5M'):
              delay=delay, timeout=timeout, fail_func=tb.refresh)
 
 
+class TaskTabs(View):
+    """View of nested tabs, designed to be included, not nested"""
+
+    @View.nested
+    class mytasks(Tab):  # noqa
+        TAB_NAME = 'My VM and Container Analysis Tasks'
+        table = Table(table_loc)
+
+    @View.nested
+    class myothertasks(Tab):  # noqa
+        TAB_NAME = 'My Other UI Tasks'
+        table = Table(table_loc)
+
+    @View.nested
+    class alltasks(Tab):  # noqa
+        TAB_NAME = 'All VM and Container Analysis Tasks'
+        table = Table(table_loc)
+
+    @View.nested
+    class allothertasks(Tab):  # noqa
+        TAB_NAME = 'All Other Tasks'
+        table = Table(table_loc)
+
+
+class TaskTabsUpdated(View):
+    """G-release changed to two tabs"""
+
+    @View.nested
+    class mytasks(Tab):  # noqa
+        TAB_NAME = 'My Tasks'
+        table = Table(table_loc)
+
+    @View.nested
+    class alltasks(Tab):  # noqa
+            TAB_NAME = 'All Tasks'
+            table = Table(table_loc)
+
+
 class TasksView(BaseLoggedInPage):
     flash = FlashMessages('.//div[starts-with(@id, "flash_text_div")]')
     # Toolbar
@@ -193,35 +232,19 @@ class TasksView(BaseLoggedInPage):
         status = CheckboxSelect(search_root='tasks_options_div')
         state = BootstrapSelect(id='state_choice')
 
-        @View.nested
-        class mytasks(Tab):  # noqa
-            TAB_NAME = "My VM and Container Analysis Tasks"
-            table = Table(table_loc)
-
-        @View.nested
-        class myothertasks(Tab):  # noqa
-            TAB_NAME = VersionPick({'5.9': 'My Tasks',
-                                    Version.lowest(): 'My Other UI Tasks'})
-            table = Table(table_loc)
-
-        @View.nested
-        class alltasks(Tab):  # noqa
-            TAB_NAME = VersionPick({'5.9': 'All Tasks',
-                                    Version.lowest(): "All VM and Container Analysis Tasks"})
-            table = Table(table_loc)
-
-        @View.nested
-        class allothertasks(Tab):  # noqa
-            TAB_NAME = "All Other Tasks"
-            table = Table(table_loc)
+        included_tabs = View.include(
+            VersionPick({
+                '5.9': TaskTabsUpdated,
+                Version.lowest(): TaskTabs}),
+            use_parent=True)
 
     @property
     def is_displayed(self):
         return (
+            self.tabs.zone.is_displayed and
+            self.tabs.period.is_displayed and
             self.tabs.mytasks.is_displayed and
-            self.tabs.myothertasks.is_displayed and
-            self.tabs.alltasks.is_displayed and
-            self.tabs.allothertasks.is_displayed)
+            self.tabs.alltasks.is_displayed)
 
 
 class Tasks(Navigatable):
@@ -246,7 +269,11 @@ class MyOtherTasks(CFMENavigateStep):
     prerequisite = NavigateToAttribute('appliance.server', 'Tasks')
 
     def step(self, *args, **kwargs):
-        self.view.tabs.myothertasks.select()
+        if self.obj.appliance.version >= '5.9':
+            logger.warning('MyOtherTasks deprecated in G-release, use MyTasks')
+            raise DestinationNotFound
+        else:
+            self.view.tabs.myothertasks.select()
 
     def am_i_here(self):
         return self.view.tabs.myothertasks.is_active()
@@ -270,7 +297,11 @@ class AllOtherTasks(CFMENavigateStep):
     prerequisite = NavigateToAttribute('appliance.server', 'Tasks')
 
     def step(self, *args, **kwargs):
-        self.view.tabs.allothertasks.select()
+        if self.obj.appliance.version >= '5.9':
+            logger.warning('AllOtherTasks deprecated in G-release, use "AllTasks"')
+            raise DestinationNotFound
+        else:
+            self.view.tabs.allothertasks.select()
 
     def am_i_here(self):
         return self.view.tabs.allothertasks.is_active()
