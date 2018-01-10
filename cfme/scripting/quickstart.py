@@ -46,6 +46,13 @@ REDHAT_PACKAGES_F26 = (
     " libffi-devel python2-devel tesseract"
     " freetype-devel")
 
+REDHAT_PACKAGES_F27 = ("Fedora release 27", "openssl",
+     " python2-virtualenv gcc postgresql-devel libxml2-devel"
+     " libxslt-devel zeromq-devel libcurl-devel"
+     " redhat-rpm-config gcc-c++ openssl-devel"
+     " libffi-devel python2-devel tesseract"
+     " freetype-devel")
+
 
 if os.path.exists(REDHAT_RELEASE_FILE):
     os.environ['PYCURL_SSL_LIBRARY'] = 'nss'
@@ -55,6 +62,8 @@ if os.path.exists(REDHAT_RELEASE_FILE):
         REDHAT_PACKAGES = REDHAT_PACKAGES_F25
     elif "Fedora release 26" in release_string:
         REDHAT_PACKAGES = REDHAT_PACKAGES_F26
+    elif "Fedora release 27" in release_string:
+        REDHAT_PACKAGES = REDHAT_PACKAGES_F27
     else:
         REDHAT_PACKAGES = REDHAT_PACKAGES_OLD
 
