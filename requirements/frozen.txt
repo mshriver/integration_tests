@@ -41,6 +41,7 @@ flake8==3.3.0
 Flask==0.12.2
 funcsigs==1.0.2
 functools32==3.2.3.post2
+function_trace
 future==0.16.0
 futures==3.0.5
 GitPython==2.1.5
@@ -166,7 +167,7 @@ scandir==1.5
 scp==0.10.2
 selenium==2.53.6
 selenium-smart-locator==0.2.0
-sentaku==0.6.2
+sentaku==0.3.0
 shyaml==0.5.0
 simplegeneric==0.8.1
 simplejson==3.10.0
