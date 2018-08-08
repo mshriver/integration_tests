@@ -195,3 +195,5 @@ The other parts of Sprout (Beat, Flower, Logserver) can be stopped simply by usi
 It is recommended to wait for long tasks (appliance preconfiguration, template deployment, ...) to finish to have the update process as fast as possible.
 
 It is recommended to shut Celery Beat down first, send a ``SIGTERM`` to the worker and wait for it to stop (or ``SIGINT`` for impatient :) ). That will ensure the smoothest worker shutdown.
+
+testing
