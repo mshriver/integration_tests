@@ -112,6 +112,12 @@ class JSInstanceEntity(JSBaseEntity):
 
             data_dict['policy'] = policy
         else:
+            from cfme.fixtures.rdb import Rdb
+            rdb_kwargs = {
+                'subject': 'RDB Breakpoint: Quadicon failure',
+                'recipients': 'mshriver@redhat.com, izapolsk@redhat.com'
+            }
+            Rdb('Quadicon KeyError #7645').set_trace(**rdb_kwargs)
             data_dict['os'] = data_dict['quad']['topLeft']['tooltip']
             data_dict['vendor'] = data_dict['quad']['bottomLeft']['tooltip']
             try:
