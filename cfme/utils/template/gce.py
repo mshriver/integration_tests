@@ -1,5 +1,5 @@
 import re
-from subprocess import check_call
+from subprocess import check_call, call
 
 from cached_property import cached_property
 
@@ -30,14 +30,16 @@ class GoogleCloudTemplateUpload(ProviderTemplateUpload):
     @log_wrap("download image locally")
     def download_image(self):
         # Check if file exists already:
-        if check_call('ls', self.local_file_path) == 0:
+        if call(['ls', self.local_file_path]) == 0:
             logger.info('Local image found, skipping download: %s', self.local_file_path)
             return True
 
         # Download file to cli-tool-client
-        return check_call('curl',
-                          '--output {}'.format(self.local_file_path),
-                          self.raw_image_url) == 0
+        return check_call([
+            'curl',
+            '--output {}'.format(self.local_file_path),
+            self.raw_image_url
+            ], timeout=1200) == 0
 
     @log_wrap("create bucket on GCE")
     def create_bucket(self):
@@ -81,4 +83,4 @@ class GoogleCloudTemplateUpload(ProviderTemplateUpload):
     @log_wrap("cleanup")
     def teardown(self):
         self.mgmt.delete_file_from_bucket(self.bucket_name, self.image_name)
-        self.execute_ssh_command('rm -f /var/tmp/templates/{}'.format(self.image_name))
+        #self.execute_ssh_command('rm -f /var/tmp/templates/{}'.format(self.image_name))

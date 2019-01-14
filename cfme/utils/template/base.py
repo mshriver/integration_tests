@@ -181,7 +181,7 @@ class ProviderTemplateUpload(object):
     def ssh_client_args(self):
         """ Returns credentials + hostname for ssh client auth."""
         cred_key = self.provider_data.get('ssh_creds') or self.provider_data['credentials']
-        return {'hostname': self.provider_data['hostname'],
+        return {'hostname': self.provider_data.get('hostname'),
                 'username': credentials[cred_key]['username'],
                 'password': credentials[cred_key]['password']}
 
