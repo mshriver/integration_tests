@@ -89,10 +89,14 @@ class ProviderTemplateUpload(object):
         """
         self.stream = stream
         self.provider_key = provider_key
-        self.template_name = template_name
+        self._template_name = template_name
         self.glance_key = kwargs.get('glance_key')  # available for multiple provider type
         self.image_url = image_url  # TODO default
         self._unzipped_file = None
+
+    @property
+    def template_name(self):
+        return self._template_name
 
     @property
     def stream_url(self):

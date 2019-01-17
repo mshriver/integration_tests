@@ -1,6 +1,6 @@
 import re
-from subprocess import check_call, call
 
+from subprocess32 import check_call, call  # timeout support from py3.3
 from cached_property import cached_property
 
 from cfme.utils.conf import credentials
@@ -12,6 +12,11 @@ class GoogleCloudTemplateUpload(ProviderTemplateUpload):
     provider_type = 'gce'
     log_name = 'GCE'
     image_pattern = re.compile(r'<a href="?\'?([^"\']*gce[^"\'>]*)')
+
+    @property
+    def template_name(self):
+        """GCE does not allow images with '.' in the name _because reasons_"""
+        return self._template_name.replace('.', '-')
 
     @property
     def bucket_name(self):
@@ -35,11 +40,11 @@ class GoogleCloudTemplateUpload(ProviderTemplateUpload):
             return True
 
         # Download file to cli-tool-client
-        return check_call([
+        return  ([
             'curl',
             '--output {}'.format(self.local_file_path),
             self.raw_image_url
-            ], timeout=1200) == 0
+            ], timeout=1200) == 0  # timeout added in py3.3, need subprocess32 for compatibility
 
     @log_wrap("create bucket on GCE")
     def create_bucket(self):
