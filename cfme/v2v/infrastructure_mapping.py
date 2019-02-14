@@ -45,6 +45,13 @@ class InfraMappingCommonButtons(InfrastructureMappingView):
     remove_all_mappings = Button("Remove All")
     mappings_tree = InfraMappingTreeView(tree_class="treeview")
 
+class MappingFillView(ParametrizedView):
+    params = [object_type]
+    source_object = MultiSelectList("source_{}".format(self.object_type))
+    target_object
+    fill_strat
+
+
 
 class InfrastructureMappingForm(InfrastructureMappingView):
     """All infrastructure mapping View"""
@@ -195,57 +202,84 @@ class EditInfrastructureMappingView(InfrastructureMappingForm):
 
 
 @attr.s
-class clusters(object):  # noqa
-    clusters = {"source_cluster": ["source_cluster"], "target_cluster": ["target_cluster"]}
-
-    source_cluster = attr.ib(default=None)
-    target_cluster = attr.ib(default=None)
-
-    def __init__(self, source_cluster, target_cluster):
-        self.source_cluster = source_cluster
-        self.target_cluster = target_cluster
-
-
-@attr.s
-class datastores(object):  # noqa
-    datastore_mappings = [
-        {"source_datastore": ["source_datastore"], "target_datastore": ["target_datastore"]}
-    ]
-
-    source_datastore = attr.ib(default=None)
-    target_datastore = attr.ib(default=None)
-
-    def __init__(self, source_datastore, target_datastore):
-        self.source_datastore = source_datastore
-        self.target_datastore = target_datastore
-
-
-@attr.s
-class networks(object):  # noqa
-    network_mappings = [
-        {"source_network": ["source_network"], "target_network": ["target_network"]}
-    ]
-
-    source_network = attr.ib(default=None)
-    target_network = attr.ib(default=None)
-
-    def __init__(self, source_network, target_network):
-        self.source_network = source_network
-        self.target_network = target_network
-
-
-@attr.s
 class InfrastructureMapping(BaseEntity, Updateable):
-    """Class representing v2v infrastructure mappings"""
+    """Class representing v2v infrastructure mappings
+
+    A mapping consists of datastore/network/cluster components
+    Each component is a list of source -> target mappings, which are many:many relationships
+    """
+
+    @attr.s
+    class InfraMappingComponent(object):
+        """A datastore/network/cluster mapping component
+
+        Modeling a many:many relationship of a single component mapping
+        """
+        comp_name = None
+
+        sources = attr.ib(validator=attr.validators.instance_of(list))
+        targets = attr.ib(validator=attr.validators.instance_of(list))
+
+        def fill_value(self):
+            return {
+                'source_'.format(self.comp_name): self.sources,
+                'target_'.format(self.comp_name): self.targets
+                }
+
+    @attr.s
+    class ClusterComponent(InfraMappingComponent):  # noqa
+        comp_name = 'cluster'
+
+    @attr.s
+    class DatastoreComponent(InfraMappingComponent):  # noqa
+        comp_name = 'datastore'
+
+    @attr.s
+    class NetworkComponent(InfraMappingComponent):  # noqa
+        comp_name = 'network'
+
 
     name = attr.ib()
     description = attr.ib(default=None)
-    cluster_mapping = attr.ib(default=None)
-    datastore_mapping = attr.ib(default=None)
-    network_mapping = attr.ib(default=None)
+    clusters = attr.ib(validator=attr.validators.instance_of(list))
+    datastores = attr.ib(validator=attr.validators.instance_of(list))
+    networks = attr.ib(validator=attr.validators.instance_of(list))
+
+    def form_values(self):
+        """Generate a dictionary for filling the InfraMapping wizard
+
+        This is a dictionary which contains 3 lists, for the 3 components
+        Each component list has dictionary elements, that contain source + target mapping lists
+        Example:
+            {'cluster':
+                [
+                    {'source_cluster': ['test_source'], 'target_cluster': ['test_target']},
+                    {'source_cluster: ['source1', 'source2'], 'target_cluster: ['t1', 't2']
+                ]
+            }
+
+        Returns: dict, see above
+
+        """
+        return {
+            "general": {"name": self.name, "description": self.description},
+            "cluster": [component.form_value() for component in self.clusters],
+            "datastore": [component.form_value() for component in self.datastores],
+            "network": [component.form_value() for component in self.networks],
+        }
 
     def update(self, updates):
+        """
+
+
+        Args:
+            updates: An entity instance, that we can call form_values on
+
+        Returns:
+
+        """
         view = navigate_to(self, "Edit", wait_for_view=20)
+        # TODO recursive update of self.form_values and updates.form_values
         view.fill(updates)
 
 
@@ -255,52 +289,13 @@ class InfrastructureMappingCollection(BaseCollection):
 
     ENTITY = InfrastructureMapping
 
-    def form_values(self, form_data):
-        name = form_data["general"]["name"]
-        description = form_data["general"].get("description", "")
-
-        cluster_list = []
-        cluster = form_data.get("cluster", [])
-        if cluster:
-            for mapping in cluster:
-                if isinstance(mapping, dict):
-                    clusters(mapping.get("source_datastore"), mapping.get("target_datastore"))
-                    cluster_list.append(mapping)
-
-        datastore_list = []
-        datastore = form_data.get("datastore", [])
-        if datastore:
-            for mapping in datastore:
-                if isinstance(mapping, dict):
-                    datastores(mapping.get("source_datastore"), mapping.get("target_datastore"))
-                    datastore_list.append(mapping)
-
-        network_list = []
-        network = form_data.get("network", [])
-        if network:
-            for mapping in network:
-                if isinstance(mapping, dict):
-                    networks(mapping.get("source_network"), mapping.get("target_network"))
-                    network_list.append(mapping)
-
-        return {
-            "general": {"name": name, "description": description},
-            "cluster": cluster_list,
-            "datastore": datastore_list,
-            "network": network_list,
-        }
-
-    def create(self, form_data):
-        view = navigate_to(self, "Add")
-        fill_form_data = self.form_values(form_data)
-        view.fill(self.form_values(form_data))
-        return self.instantiate(
-            name=fill_form_data["general"]["name"],
-            description=fill_form_data["general"].get("description", ""),
-            cluster_mapping=fill_form_data["cluster"],
-            datastore_mapping=fill_form_data["datastore"],
-            network_mapping=fill_form_data["network"],
+    def create(self, name, description, clusters, datastores, networks, *args, **kwargs):
+        mapping = self.instantiate(
+            name, description, clusters, datastores, networks, *args, **kwargs
         )
+        view = navigate_to(self, "Add")
+        view.fill(mapping.form_values())
+        return mapping
 
     def mapping_exists(self, mapping):
         view = navigate_to(self, "All")
