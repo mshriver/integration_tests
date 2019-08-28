@@ -246,7 +246,8 @@ class SmemMemoryMonitor(Thread):
 
     def get_pids_memory(self):
         result = self.ssh_client.run_command(
-            "/usr/bin/python2.7 /usr/bin/smem -c 'pid rss pss uss vss swap name command' | sed 1d")
+            "/usr/bin/python2.7 /usr/bin/smem -c 'pid rss pss uss vss swap name command' | sed 1d"
+        )
         pids_memory = result.output.strip().split('\n')
         memory_by_pid = {}
         for line in pids_memory:
@@ -290,7 +291,7 @@ class SmemMemoryMonitor(Thread):
         """
         appliance_results = OrderedDict()
         process_results = OrderedDict()
-        install_smem(self.ssh_client)
+        #install_smem(self.ssh_client)
         self.get_miq_server_id()
         logger.info('Starting Monitoring Thread.')
         while self.signal:
@@ -356,20 +357,19 @@ class SmemMemoryMonitor(Thread):
         try:
             self._real_run()
         except Exception as e:
-            logger.error('Error in Monitoring Thread: {}'.format(e))
-            logger.error('{}'.format(traceback.format_exc()))
+            logger.exception('Error in Monitoring Thread: {}'.format(e))
 
 
-def install_smem(ssh_client):
-    # smem is included by default in 5.6 appliances
-    logger.info('Installing smem.')
-    ver = get_version()
-    if ver == '55':
-        ssh_client.run_command('rpm -i {}'.format(cfme_performance['tools']['rpms']['epel7_rpm']))
-        ssh_client.run_command('yum install -y smem')
-    # Patch smem to display longer command line names
-    logger.info('Patching smem')
-    ssh_client.run_command(r'sed -i s/\.27s/\.200s/g /usr/bin/smem')
+# def install_smem(ssh_client):
+#     # smem is included by default in 5.6 appliances
+#     logger.info('Installing smem.')
+#     ver = get_version()
+#     if ver == '55':
+#         ssh_client.run_command('rpm -i {}'.format(cfme_performance['tools']['rpms']['epel7_rpm']))
+#         ssh_client.run_command('yum install -y smem')
+#     # Patch smem to display longer command line names
+#     logger.info('Patching smem')
+#     ssh_client.run_command(r'sed -i s/\.27s/\.200s/g /usr/bin/smem')
 
 
 def create_report(scenario_data, appliance_results, process_results, use_slab, grafana_urls):
@@ -946,7 +946,7 @@ def generate_workload_html(directory, ver, scenario_data, provider_names, grafan
 def add_workload_quantifiers(quantifiers, scenario_data):
     starttime = time.time()
     ver = current_version()
-    workload_path = results_path.join('{}-{}-{}'.format(test_ts, scenario_data['test_dir'], ver))
+    workload_path = results_path.join(f"{test_ts}-{scenario_data['test_dir']}-{ver}")
     directory = workload_path.join(scenario_data['scenario']['name'])
     file_name = str(directory.join('workload.html'))
     marker = '<b>Quantifier Data: </b>'
@@ -954,14 +954,14 @@ def add_workload_quantifiers(quantifiers, scenario_data):
     yaml_string = str(json.dumps(yaml_dict, indent=4))
     yaml_html = yaml_string.replace('\n', '<br>\n')
 
-    with open(file_name, 'r+') as html_file:
+    with open(file_name, 'w+') as html_file:
         line = ''
         while marker not in line:
             line = html_file.readline()
         marker_pos = html_file.tell()
         remainder = html_file.read()
         html_file.seek(marker_pos)
-        html_file.write('{} \n'.format(yaml_html))
+        html_file.write(f'{yaml_html} \n')
         html_file.write(remainder)
 
     timediff = time.time() - starttime

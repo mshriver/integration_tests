@@ -36,7 +36,7 @@ def test_idle(appliance, request, scenario):
     scenario_data = {'appliance_ip': appliance.hostname,
         'appliance_name': cfme_performance['appliance']['appliance_name'],
         'test_dir': 'workload-idle',
-        'test_name': 'Idle with {} Roles'.format(scenario['name']),
+        'test_name': f'Idle with {scenario["name"]} Roles',
         'appliance_roles': ', '.join(scenario['roles']),
         'scenario': scenario}
     monitor_thread = SmemMemoryMonitor(appliance.ssh_client(), scenario_data)
@@ -51,15 +51,17 @@ def test_idle(appliance, request, scenario):
         monitor_thread.join()
         add_workload_quantifiers(quantifiers, scenario_data)
         timediff = time.time() - starttime
-        logger.info('Finished cleaning up monitoring thread in {}'.format(timediff))
+        logger.info(f'Finished cleaning up monitoring thread in {timediff}')
     request.addfinalizer(lambda: cleanup_workload(from_ts, quantifiers, scenario_data))
 
     monitor_thread.start()
 
     appliance.wait_for_miq_server_workers_started(poll_interval=2)
-    appliance.update_server_roles({role: True for role in scenario['roles']})
+    roles_to_update = {role: True for role in scenario['roles']}
+    logger.info(f'IDLE TEST ROLES: {roles_to_update}')
+    appliance.update_server_roles(roles_to_update)
     s_time = scenario['total_time']
-    logger.info('Idling appliance for {}s'.format(s_time))
+    logger.info(f'Idling appliance for {s_time}s')
     time.sleep(s_time)
 
     quantifiers['Elapsed_Time'] = s_time

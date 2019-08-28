@@ -2222,12 +2222,14 @@ ExecStartPre=/usr/bin/bash -c "ipcs -s|grep apache|cut -d\  -f2|while read line;
         self.ssh_client.run_command('sync; '
                                     'sync; '
                                     'echo 3 > /proc/sys/vm/drop_caches')
-        self.collectd.stop()
+        if self.collectd.enabled:
+            self.collectd.stop()
         self.db_service.restart()
         self.ssh_client.run_command('cd /var/www/miq/vmdb; '
                                     'bin/rake evm:db:reset')
         self.ssh_client.run_rake_command('db:seed')
-        self.collectd.start()
+        if self.collectd.enabled:
+            self.collectd.start()
         self.ssh_client.run_command('rm -rf /var/www/miq/vmdb/log/*.log*')
         self.ssh_client.run_command('rm -rf /var/www/miq/vmdb/log/apache/*.log*')
         self.evmserverd.start()
