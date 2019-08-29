@@ -2,7 +2,6 @@
 import json
 import os
 import time
-import traceback
 from collections import OrderedDict
 from datetime import datetime
 from threading import Thread
@@ -10,11 +9,8 @@ from threading import Thread
 import yaml
 from yaycl import AttrDict
 
-from cfme.utils.conf import cfme_performance
 from cfme.utils.log import logger
 from cfme.utils.path import results_path
-from cfme.utils.version import current_version
-from cfme.utils.version import get_version
 
 miq_workers = [
     'MiqGenericWorker',
@@ -125,7 +121,7 @@ ruby_processes.extend(['evm:dbsync:replicate', 'MIQ Server (evm_server.rb)', 'ev
     'appliance_console.rb'])
 
 process_order = list(ruby_processes)
-process_order.extend(['memcached', 'postgres', 'httpd', 'collectd'])
+process_order.extend(['memcached', 'postgres', 'httpd',])  #'collectd'])
 
 # Timestamp created at first import, thus grouping all reports of like workload
 test_ts = time.strftime('%Y%m%d%H%M%S')
@@ -135,9 +131,10 @@ SAMPLE_INTERVAL = 10
 
 
 class SmemMemoryMonitor(Thread):
-    def __init__(self, ssh_client, scenario_data):
+    def __init__(self, appliance, scenario_data):
         super(SmemMemoryMonitor, self).__init__()
-        self.ssh_client = ssh_client
+        self.appliance = appliance
+        self.ssh_client = appliance.ssh_client()
         self.scenario_data = scenario_data
         self.grafana_urls = {}
         self.miq_server_id = ''
@@ -165,7 +162,7 @@ class SmemMemoryMonitor(Thread):
             process_results[process_name][process_pid][starttime]['swap'] = swap_mem
             del memory_by_pid[process_pid]
         else:
-            logger.warning('Process {} PID, not found: {}'.format(process_name, process_pid))
+            logger.warning(f'Process {process_name} PID, not found: {process_pid}')
 
     def get_appliance_memory(self, appliance_results, plottime):
         # 5.5/5.6 - RHEL 7 / Centos 7
@@ -202,9 +199,10 @@ class SmemMemoryMonitor(Thread):
 
     def get_evm_workers(self):
         result = self.ssh_client.run_command(
-            'psql -t -q -d vmdb_production -c '
-            '\"select pid,type from miq_workers where miq_server_id = \'{}\'\"'.format(
-                self.miq_server_id))
+            f'psql -t -q -d vmdb_production -c '
+            f'"select pid,type from miq_workers where miq_server_id = \'{self.miq_server_id}\'"'
+        )
+        logger.info(f'DEBUG: worker query output: \n{result.output}\n')
         if result.output.strip():
             workers = {}
             for worker in result.output.strip().split('\n'):
@@ -212,7 +210,7 @@ class SmemMemoryMonitor(Thread):
                 if len(pid_worker) == 2:
                     workers[pid_worker[0].strip()] = pid_worker[1].strip()
                 else:
-                    logger.error('Unexpected output from psql: {}'.format(worker))
+                    logger.error(f'Unexpected output from psql: {worker}')
             return workers
         else:
             return {}
@@ -265,9 +263,9 @@ class SmemMemoryMonitor(Thread):
                     memory_by_pid[pid]['name'] = values[6]
                     memory_by_pid[pid]['cmd'] = ' '.join(values[7:])
                 except Exception as e:
-                    logger.error('Processing smem output error: {}'.format(e.__class__.__name__, e))
-                    logger.error('Issue with pid: {} line: {}'.format(pid, line))
-                    logger.error('Complete smem output: {}'.format(result.output))
+                    logger.exception('Processing smem output error')
+                    logger.error(f'Issue with pid: {pid} line: {line}')
+                    logger.error(f'Complete smem output: {result.output}')
         return memory_by_pid
 
     def _real_run(self):
@@ -300,11 +298,13 @@ class SmemMemoryMonitor(Thread):
 
             self.get_appliance_memory(appliance_results, plottime)
             workers = self.get_evm_workers()
+            logger.info(f'DEBUG: workers in real_run: \n{workers}\n')
             memory_by_pid = self.get_pids_memory()
+            logger.info(f'DEBUG: memory_by_pid in real_run: \n{memory_by_pid}\n')
 
-            for worker_pid in workers:
-                self.create_process_result(process_results, plottime, worker_pid,
-                    workers[worker_pid], memory_by_pid)
+            for pid, worker_name in workers.items():
+                self.create_process_result(process_results, plottime, pid,
+                    worker_name, memory_by_pid)
 
             for pid in sorted(memory_by_pid.keys()):
                 if memory_by_pid[pid]['name'] == 'httpd':
@@ -319,9 +319,9 @@ class SmemMemoryMonitor(Thread):
                 elif memory_by_pid[pid]['name'] == 'memcached':
                     self.create_process_result(process_results, plottime, pid, 'memcached',
                         memory_by_pid)
-                elif memory_by_pid[pid]['name'] == 'collectd':
-                    self.create_process_result(process_results, plottime, pid, 'collectd',
-                        memory_by_pid)
+                # elif memory_by_pid[pid]['name'] == 'collectd':
+                #     self.create_process_result(process_results, plottime, pid, 'collectd',
+                #         memory_by_pid)
                 elif memory_by_pid[pid]['name'] == 'ruby':
                     if 'evm_server.rb' in memory_by_pid[pid]['cmd']:
                         self.create_process_result(process_results, plottime, pid,
@@ -351,13 +351,13 @@ class SmemMemoryMonitor(Thread):
         logger.info('Monitoring CFME Memory Terminating')
 
         create_report(self.scenario_data, appliance_results, process_results, self.use_slab,
-            self.grafana_urls)
+            self.grafana_urls, self.appliance.version)
 
     def run(self):
         try:
             self._real_run()
         except Exception as e:
-            logger.exception('Error in Monitoring Thread: {}'.format(e))
+            logger.exception('Error in Monitoring Thread')
 
 
 # def install_smem(ssh_client):
@@ -372,15 +372,15 @@ class SmemMemoryMonitor(Thread):
 #     ssh_client.run_command(r'sed -i s/\.27s/\.200s/g /usr/bin/smem')
 
 
-def create_report(scenario_data, appliance_results, process_results, use_slab, grafana_urls):
+def create_report(
+    scenario_data, appliance_results, process_results, use_slab, grafana_urls, version):
     logger.info('Creating Memory Monitoring Report.')
-    ver = current_version()
 
     provider_names = 'No Providers'
     if 'providers' in scenario_data['scenario']:
         provider_names = ', '.join(scenario_data['scenario']['providers'])
 
-    workload_path = results_path.join('{}-{}-{}'.format(test_ts, scenario_data['test_dir'], ver))
+    workload_path = results_path.join(f"{test_ts}-{scenario_data['test_dir']}-{version}")
     if not os.path.exists(str(workload_path)):
         os.makedirs(str(workload_path))
 
@@ -400,7 +400,8 @@ def create_report(scenario_data, appliance_results, process_results, use_slab, g
     if not os.path.exists(str(mem_rawdata_path)):
         os.mkdir(str(mem_rawdata_path))
 
-    graph_appliance_measurements(mem_graphs_path, ver, appliance_results, use_slab, provider_names)
+    graph_appliance_measurements(
+        mem_graphs_path, version, appliance_results, use_slab, provider_names)
     graph_individual_process_measurements(mem_graphs_path, process_results, provider_names)
     graph_same_miq_workers(mem_graphs_path, process_results, provider_names)
     graph_all_miq_workers(mem_graphs_path, process_results, provider_names)
@@ -409,12 +410,12 @@ def create_report(scenario_data, appliance_results, process_results, use_slab, g
     with open(str(scenario_path.join('scenario.yml')), 'w') as scenario_file:
         yaml.safe_dump(dict(scenario_data['scenario']), scenario_file, default_flow_style=False)
 
-    generate_summary_csv(scenario_path.join('{}-summary.csv'.format(ver)), appliance_results,
-        process_results, provider_names, ver)
+    generate_summary_csv(scenario_path.join(f'{version}-summary.csv'), appliance_results,
+        process_results, provider_names, version)
     generate_raw_data_csv(mem_rawdata_path, appliance_results, process_results)
-    generate_summary_html(scenario_path, ver, appliance_results, process_results, scenario_data,
+    generate_summary_html(scenario_path, version, appliance_results, process_results, scenario_data,
         provider_names, grafana_urls)
-    generate_workload_html(scenario_path, ver, scenario_data, provider_names, grafana_urls)
+    generate_workload_html(scenario_path, version, scenario_data, provider_names, grafana_urls)
 
     logger.info('Finished Creating Report')
 
@@ -460,21 +461,22 @@ def generate_raw_data_csv(directory, appliance_results, process_results):
             with open(file_name, 'w') as csv_file:
                 csv_file.write('TimeStamp,RSS,PSS,USS,VSS,SWAP\n')
                 for ts in process_results[process_name][process_pid]:
-                    csv_file.write('{},{},{},{},{},{}\n'.format(ts,
-                        process_results[process_name][process_pid][ts]['rss'],
-                        process_results[process_name][process_pid][ts]['pss'],
-                        process_results[process_name][process_pid][ts]['uss'],
-                        process_results[process_name][process_pid][ts]['vss'],
-                        process_results[process_name][process_pid][ts]['swap']))
+                    # comma separated list with newline
+                    csv_file.write(f'{ts},'
+                                   f'{process_results[process_name][process_pid][ts]["rss"]},'
+                                   f'{process_results[process_name][process_pid][ts]["pss"]},'
+                                   f'{process_results[process_name][process_pid][ts]["uss"]},'
+                                   f'{process_results[process_name][process_pid][ts]["vss"]},'
+                                   f'{process_results[process_name][process_pid][ts]["swap"]}\n')
     timediff = time.time() - starttime
-    logger.info('Generated Raw Data CSVs in: {}'.format(timediff))
+    logger.info(f'Generated Raw Data CSVs in: {timediff}')
 
 
 def generate_summary_csv(file_name, appliance_results, process_results, provider_names,
         version_string):
     starttime = time.time()
     with open(str(file_name), 'w') as csv_file:
-        csv_file.write('Version: {}, Provider(s): {}\n'.format(version_string, provider_names))
+        csv_file.write(f'Version: {version_string}, Provider(s): {provider_names}\n')
         csv_file.write('Measurement,Start of test,End of test\n')
         start = list(appliance_results.keys())[0]
         end = list(appliance_results.keys())[-1]
@@ -507,7 +509,7 @@ def generate_summary_csv(file_name, appliance_results, process_results, provider
         summary_csv_measurement_dump(csv_file, process_results, 'swap')
 
     timediff = time.time() - starttime
-    logger.info('Generated Summary CSV in: {}'.format(timediff))
+    logger.info(f'Generated Summary CSV in: {timediff}')
 
 
 def generate_summary_html(directory, version_string, appliance_results, process_results,
@@ -516,17 +518,28 @@ def generate_summary_html(directory, version_string, appliance_results, process_
     file_name = str(directory.join('index.html'))
     with open(file_name, 'w') as html_file:
         html_file.write('<html>\n')
-        html_file.write('<head><title>{} - {} Memory Usage Performance</title></head>'.format(
-            version_string, provider_names))
-
+        html_file.write(
+            '<head><title>'
+            f'{version_string} - {provider_names} Memory Usage Performance'
+            '</title></head>'
+        )
         html_file.write('<body>\n')
-        html_file.write('<b>CFME {} {} Test Results</b><br>\n'.format(version_string,
-            scenario_data['test_name'].title()))
-        html_file.write('<b>Appliance Roles:</b> {}<br>\n'.format(
-            scenario_data['appliance_roles'].replace(',', ', ')))
-        html_file.write('<b>Provider(s):</b> {}<br>\n'.format(provider_names))
-        html_file.write('<b><a href=\'https://{}/\' target="_blank">{}</a></b>\n'.format(
-            scenario_data['appliance_ip'], scenario_data['appliance_name']))
+        html_file.write(
+            '<b>'
+            f'CFME {version_string} {scenario_data["test_name"].title()} Test Results'
+            '</b><br>\n'
+        )
+        html_file.write(
+            '<b>'
+            f'Appliance Roles:</b> {scenario_data["appliance_roles"].replace(",", ", ")}'
+            '<br>\n'
+        )
+        html_file.write(f'<b>Provider(s):</b> {provider_names}<br>\n')
+        html_file.write(
+            f'<b><a href=\'https://{scenario_data["appliance_ip"]}/\' target="_blank">'
+            f'{scenario_data["appliance_name"]}'
+            '</a></b>\n'
+        )
         if grafana_urls:
             for g_name in sorted(grafana_urls.keys()):
                 html_file.write(
@@ -707,26 +720,26 @@ def generate_summary_html(directory, version_string, appliance_results, process_
         html_file.write('</tr>\n')
 
         # collectd Summary
-        a_pids, r_pids, t_rss, t_pss, t_uss, t_vss, t_swap = compile_per_process_results(
-            ['collectd'], process_results, end)
-        t_a_pids += a_pids
-        t_r_pids += r_pids
-        tt_rss += t_rss
-        tt_pss += t_pss
-        tt_uss += t_uss
-        tt_vss += t_vss
-        tt_swap += t_swap
-        html_file.write('<tr>\n')
-        html_file.write('<td>collectd</td>\n')
-        html_file.write('<td>{}</td>\n'.format(a_pids + r_pids))
-        html_file.write('<td>{}</td>\n'.format(a_pids))
-        html_file.write('<td>{}</td>\n'.format(r_pids))
-        html_file.write('<td>{}</td>\n'.format(round(t_rss, 2)))
-        html_file.write('<td>{}</td>\n'.format(round(t_pss, 2)))
-        html_file.write('<td>{}</td>\n'.format(round(t_uss, 2)))
-        html_file.write('<td>{}</td>\n'.format(round(t_vss, 2)))
-        html_file.write('<td>{}</td>\n'.format(round(t_swap, 2)))
-        html_file.write('</tr>\n')
+        # a_pids, r_pids, t_rss, t_pss, t_uss, t_vss, t_swap = compile_per_process_results(
+        #     ['collectd'], process_results, end)
+        # t_a_pids += a_pids
+        # t_r_pids += r_pids
+        # tt_rss += t_rss
+        # tt_pss += t_pss
+        # tt_uss += t_uss
+        # tt_vss += t_vss
+        # tt_swap += t_swap
+        # html_file.write('<tr>\n')
+        # html_file.write('<td>collectd</td>\n')
+        # html_file.write('<td>{}</td>\n'.format(a_pids + r_pids))
+        # html_file.write('<td>{}</td>\n'.format(a_pids))
+        # html_file.write('<td>{}</td>\n'.format(r_pids))
+        # html_file.write('<td>{}</td>\n'.format(round(t_rss, 2)))
+        # html_file.write('<td>{}</td>\n'.format(round(t_pss, 2)))
+        # html_file.write('<td>{}</td>\n'.format(round(t_uss, 2)))
+        # html_file.write('<td>{}</td>\n'.format(round(t_vss, 2)))
+        # html_file.write('<td>{}</td>\n'.format(round(t_swap, 2)))
+        # html_file.write('</tr>\n')
 
         html_file.write('<tr>\n')
         html_file.write('<td>total</td>\n')
@@ -842,6 +855,7 @@ def generate_summary_html(directory, version_string, appliance_results, process_
 def generate_workload_html(directory, ver, scenario_data, provider_names, grafana_urls):
     starttime = time.time()
     file_name = str(directory.join('workload.html'))
+    logger.info('Generating workload html')
     with open(file_name, 'w') as html_file:
         html_file.write('<html>\n')
         html_file.write('<head><title>{} - {}</title></head>'.format(
@@ -943,21 +957,28 @@ def generate_workload_html(directory, ver, scenario_data, provider_names, grafan
     logger.info('Generated Workload html in: {}'.format(timediff))
 
 
-def add_workload_quantifiers(quantifiers, scenario_data):
+def add_workload_quantifiers(quantifiers, scenario_data, appliance):
     starttime = time.time()
-    ver = current_version()
-    workload_path = results_path.join(f"{test_ts}-{scenario_data['test_dir']}-{ver}")
+    logger.info('Adding workload quantifiers')
+    workload_path = results_path.join(
+        f"{test_ts}-{scenario_data['test_dir']}-{appliance.version}"
+    )
     directory = workload_path.join(scenario_data['scenario']['name'])
-    file_name = str(directory.join('workload.html'))
+    workload_file = directory.join('workload.html')
+    workload_file.ensure()  # create file if needed
+
     marker = '<b>Quantifier Data: </b>'
     yaml_dict = quantifiers
     yaml_string = str(json.dumps(yaml_dict, indent=4))
     yaml_html = yaml_string.replace('\n', '<br>\n')
 
-    with open(file_name, 'w+') as html_file:
+    with open(workload_file.strpath, 'w+') as html_file:
         line = ''
         while marker not in line:
             line = html_file.readline()
+            if line == '':
+                # end of the file
+                break
         marker_pos = html_file.tell()
         remainder = html_file.read()
         html_file.seek(marker_pos)
@@ -997,6 +1018,11 @@ def graph_appliance_measurements(graphs_path, ver, appliance_results, use_slab, 
     starttime = time.time()
 
     dates = list(appliance_results.keys())
+    # t, f, u, b, c, s, swt, swf = [
+    #     [appliance_results[ts][k]
+    #      for k in ['total', 'free', 'used', 'buffers', 'cached', 'slab', 'swap_total', 'swap_free']]
+    #     for ts in appliance_results.keys()
+    # ]
     total_memory_list = list(appliance_results[ts]['total']
                              for ts in appliance_results.keys())
     free_memory_list = list(appliance_results[ts]['free']

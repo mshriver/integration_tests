@@ -2,12 +2,12 @@ import time
 
 import pytest
 
-from cfme.markers.env_markers.provider import providers
+from cfme.cloud.provider import CloudProvider
+from cfme.infrastructure.provider import InfraProvider
 from cfme.utils import conf
 from cfme.utils.appliance.implementations.ui import navigate_to
 from cfme.utils.grafana import get_scenario_dashboard_urls
 from cfme.utils.log import logger
-from cfme.utils.providers import ProviderFilter
 from cfme.utils.smem_memory_monitor import add_workload_quantifiers
 from cfme.utils.smem_memory_monitor import SmemMemoryMonitor
 from cfme.utils.workloads import get_memory_leak_scenarios
@@ -18,8 +18,7 @@ roles_memory_leak = ['automate', 'database_operations', 'ems_inventory', 'ems_me
     'reporting', 'scheduler', 'user_interface', 'web_services']
 
 
-pytestmark = [pytest.mark.provider(gen_func=providers,
-                                   filters=[ProviderFilter()],
+pytestmark = [pytest.mark.provider([CloudProvider, InfraProvider],
                                    scope="module")]
 
 

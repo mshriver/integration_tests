@@ -4,21 +4,23 @@ import time
 
 import pytest
 
+from cfme.infrastructure.provider.virtualcenter import VMwareProvider
+from cfme.markers.env_markers.provider import ONE_PER_TYPE
 from cfme.utils.conf import cfme_performance
 from cfme.utils.grafana import get_scenario_dashboard_urls
 from cfme.utils.log import logger
-from cfme.utils.providers import get_crud
 from cfme.utils.smem_memory_monitor import add_workload_quantifiers
 from cfme.utils.smem_memory_monitor import SmemMemoryMonitor
 from cfme.utils.workloads import get_refresh_providers_scenarios
 
 roles_refresh_providers = ['automate', 'database_operations', 'ems_inventory', 'ems_operations',
-    'event', 'reporting', 'scheduler', 'smartstate', 'user_interface', 'web_services', 'websocket']
+    'event', 'reporting', 'scheduler', 'smartstate', 'user_interface', 'web_services']
 
 
 @pytest.mark.usefixtures('generate_version_files')
 @pytest.mark.parametrize('scenario', get_refresh_providers_scenarios())
-def test_refresh_providers(appliance, request, scenario):
+@pytest.mark.provider([VMwareProvider], selector=ONE_PER_TYPE)
+def test_refresh_providers(appliance, request, scenario, provider, setup_provider):
     """
     Refreshes providers then waits for a specific amount of time.
     Memory Monitor creates graphs and summary at the end of the scenario.
@@ -42,7 +44,7 @@ def test_refresh_providers(appliance, request, scenario):
         'appliance_roles': ', '.join(roles_refresh_providers),
         'scenario': scenario
     }
-    monitor_thread = SmemMemoryMonitor(appliance.ssh_client(), scenario_data)
+    monitor_thread = SmemMemoryMonitor(appliance, scenario_data)
 
     def cleanup_workload(scenario, from_ts, quantifiers, scenario_data):
         starttime = time.time()
@@ -52,7 +54,7 @@ def test_refresh_providers(appliance, request, scenario):
         monitor_thread.grafana_urls = g_urls
         monitor_thread.signal = False
         monitor_thread.join()
-        add_workload_quantifiers(quantifiers, scenario_data)
+        add_workload_quantifiers(quantifiers, scenario_data, appliance)
         timediff = time.time() - starttime
         logger.info('Finished cleaning up monitoring thread in {}'.format(timediff))
 
@@ -62,8 +64,9 @@ def test_refresh_providers(appliance, request, scenario):
 
     appliance.wait_for_miq_server_workers_started(poll_interval=2)
     appliance.update_server_roles({role: True for role in roles_refresh_providers})
-    for prov in scenario['providers']:
-        get_crud(prov).create_rest()
+    # replaced with fixture/marker use
+    # for prov in scenario['providers']:
+    #     get_crud(prov).create_rest()
 
     # Variable amount of time for refresh workload
     total_time = scenario['total_time']

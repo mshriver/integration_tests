@@ -39,7 +39,7 @@ def test_idle(appliance, request, scenario):
         'test_name': f'Idle with {scenario["name"]} Roles',
         'appliance_roles': ', '.join(scenario['roles']),
         'scenario': scenario}
-    monitor_thread = SmemMemoryMonitor(appliance.ssh_client(), scenario_data)
+    monitor_thread = SmemMemoryMonitor(appliance, scenario_data)
 
     def cleanup_workload(from_ts, quantifiers, scenario_data):
         starttime = time.time()
@@ -49,7 +49,7 @@ def test_idle(appliance, request, scenario):
         monitor_thread.grafana_urls = g_urls
         monitor_thread.signal = False
         monitor_thread.join()
-        add_workload_quantifiers(quantifiers, scenario_data)
+        add_workload_quantifiers(quantifiers, scenario_data, appliance)
         timediff = time.time() - starttime
         logger.info(f'Finished cleaning up monitoring thread in {timediff}')
     request.addfinalizer(lambda: cleanup_workload(from_ts, quantifiers, scenario_data))

@@ -16,7 +16,7 @@ from cfme.utils.workloads import get_refresh_vms_scenarios
 FULL_REFRESH_THRESHOLD_DEFAULT = 100
 
 roles_refresh_vms = ['automate', 'database_operations', 'ems_inventory', 'ems_operations',
-    'event', 'reporting', 'scheduler', 'smartstate', 'user_interface', 'web_services', 'websocket']
+    'event', 'reporting', 'scheduler', 'smartstate', 'user_interface', 'web_services']
 
 
 @pytest.mark.usefixtures('generate_version_files')
@@ -42,7 +42,7 @@ def test_refresh_vms(appliance, request, scenario):
         'test_name': 'Refresh VMs',
         'appliance_roles': ', '.join(roles_refresh_vms),
         'scenario': scenario}
-    monitor_thread = SmemMemoryMonitor(appliance.ssh_client(), scenario_data)
+    monitor_thread = SmemMemoryMonitor(appliance, scenario_data)
 
     def cleanup_workload(scenario, from_ts, quantifiers, scenario_data):
         starttime = time.time()
@@ -52,7 +52,7 @@ def test_refresh_vms(appliance, request, scenario):
         monitor_thread.grafana_urls = g_urls
         monitor_thread.signal = False
         monitor_thread.join()
-        add_workload_quantifiers(quantifiers, scenario_data)
+        add_workload_quantifiers(quantifiers, scenario_data, appliance)
         timediff = time.time() - starttime
         logger.info('Finished cleaning up monitoring thread in {}'.format(timediff))
     request.addfinalizer(lambda: cleanup_workload(scenario, from_ts, quantifiers, scenario_data))

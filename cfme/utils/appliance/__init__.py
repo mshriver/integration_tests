@@ -2217,6 +2217,7 @@ ExecStartPre=/usr/bin/bash -c "ipcs -s|grep apache|cut -d\  -f2|while read line;
             ssh_client.run_rake_command("evm:automate:reset")
 
     def clean_appliance(self):
+        logger.info('Running clean_appliance, stopping and restarting services, dropping logs')
         starttime = time()
         self.evmserverd.stop()
         self.ssh_client.run_command('sync; '
