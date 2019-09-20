@@ -120,7 +120,7 @@ def user_obj(appliance, auth_user, user_type):
 @pytest.mark.uncollectif(lambda auth_user: not any([True for g in auth_user.groups or []
                                                    if 'evmgroup' in g.lower()]),
                          reason='No evm group available for user')
-def test_login_evm_group(appliance, auth_user, user_obj, soft_assert):
+def test_login_evm_group(appliance, auth_user, user_obj, soft_assert, request):
     """This test checks whether a user can login while assigned a default EVM group
         Prerequisities:
             * ``auth_data.yaml`` file
@@ -135,9 +135,12 @@ def test_login_evm_group(appliance, auth_user, user_obj, soft_assert):
     # get a list of groups for the user that match evm default group names
     # Replace spaces with dashes in UPN type usernames for login compatibility
     evm_group_names = [group for group in auth_user.groups if 'evmgroup' in group.lower()]
+    appliance.server.logout()
+    request.addfinalizer(appliance.browser.quit_browser)
+
     with user_obj:
         logger.info('Logging in as user %s, member of groups %s', user_obj, evm_group_names)
-        view = navigate_to(appliance.server, 'Dashboard')
+        view = navigate_to(appliance.server, 'Dashboard', wait_for_view=60)
         assert view.is_displayed, 'user {} failed login'.format(user_obj)
         soft_assert(user_obj.name == view.current_fullname,
                     'user {} is not in view fullname'.format(user_obj))
@@ -203,8 +206,11 @@ def test_login_retrieve_group(appliance, request, auth_mode, auth_provider, soft
     # retrieving in test call and not fixture, getting the group from auth provider is part of test
     group = retrieve_group(appliance, auth_mode, auth_user.username, non_evm_group, auth_provider)
 
+    appliance.server.logout()
+    request.addfinalizer(appliance.browser.quit_browser)
+
     with user_obj:
-        view = navigate_to(appliance.server, 'LoggedIn')
+        view = navigate_to(appliance.server, 'Dashboard', wait_for_view=60)
         soft_assert(view.current_fullname == user_obj.name,
                     'user full name "{}" did not match UI display name "{}"'
                     .format(user_obj.name, view.current_fullname))
@@ -244,6 +250,9 @@ def local_group(appliance):
     assert group.exists
     yield group
 
+    appliance.browser.widgetastic.refresh()
+    appliance.server.login_admin()
+
     if group.exists:
         group.delete()
 
@@ -260,6 +269,9 @@ def local_user(appliance, auth_user, user_type, auth_provider, local_group):
 
     yield user
 
+    appliance.browser.widgetastic.refresh()
+    appliance.server.login_admin()
+
     if user.exists:
         user.delete()
 
@@ -267,7 +279,7 @@ def local_user(appliance, auth_user, user_type, auth_provider, local_group):
 @pytest.mark.tier(1)
 @pytest.mark.uncollectif(lambda auth_mode: auth_mode == 'amazon',
                          'Amazon auth_data needed for local group testing')
-def test_login_local_group(appliance, local_user, local_group, soft_assert):
+def test_login_local_group(appliance, local_user, local_group, soft_assert, request):
     """
     Test remote authentication with a locally created group.
     Group is NOT retrieved from or matched to those on authentication provider
@@ -281,8 +293,11 @@ def test_login_local_group(appliance, local_user, local_group, soft_assert):
     # modify auth settings to not get groups
     appliance.server.authentication.auth_settings = {'auth_settings': {'get_groups': False}}
 
+    appliance.server.logout()
+    request.addfinalizer(appliance.browser.quit_browser)
+
     with local_user:
-        view = navigate_to(appliance.server, 'LoggedIn')
+        view = navigate_to(appliance.server, 'Dashboard', wait_for_view=60)
         soft_assert(view.current_fullname == local_user.name,
                     'user full name "{}" did not match UI display name "{}"'
                     .format(local_user.name, view.current_fullname))
@@ -321,8 +336,11 @@ def test_user_group_switching(appliance, auth_user, auth_mode, auth_provider, so
         logger.info('All user groups for group switching are evm built-in: {}'
                     .format(auth_user.groups))
 
+    appliance.server.logout()
+    request.addfinalizer(appliance.browser.quit_browser)
+
     with user_obj:
-        view = navigate_to(appliance.server, 'LoggedIn')
+        view = navigate_to(appliance.server, 'Dashboard', wait_for_view=60)
         # Check there are multiple groups displayed
         assert len(view.group_names) > 1, 'Only a single group is displayed for the user'
         display_other_groups = [g for g in view.group_names if g != view.current_groupname]
