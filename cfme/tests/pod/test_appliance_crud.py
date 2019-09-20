@@ -319,7 +319,7 @@ def ipa_user(temp_pod_appliance, ipa_auth_provider):
     try:
         user_data = auth_user_data(ipa_auth_provider.key, 'uid')[0]
     except IndexError:
-        pytest.fail("No auth users found")
+        pytest.skip("No auth users found")
 
     user = appliance.collections.users.simple_user(
         user_data.username,

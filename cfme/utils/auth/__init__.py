@@ -84,9 +84,9 @@ def auth_user_data(provider_key, user_type):
                 if provider_key in user.providers and user_type in user.user_types]
         assert data
     except (KeyError, AttributeError, AssertionError):
-        logger.warning('Exception fetching auth_user_data from key %s and type %s',
-                       provider_key, user_type)
-        return None
+        logger.debug('Exception fetching auth_user_data from key %s and type %s',
+                     provider_key, user_type)
+        return []
     return data
 
 

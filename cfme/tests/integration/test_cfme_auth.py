@@ -87,10 +87,12 @@ def pytest_generate_tests(metafunc):
                                   if prov_dict.type == auth_type}
             for user_type in test_param_maps[mode][auth_type]['user_types']:
                 for key, prov_dict in eligible_providers.items():
-                    for user_dict in [u for u in auth_user_data(key, user_type) or []]:
+                    for user_dict in auth_user_data(key, user_type):
                         if user_type in prov_dict.get('user_types', []):
                             argvalues.append((mode, key, user_type, user_dict))
                             idlist.append('-'.join([mode, key, user_type, user_dict.username]))
+                    else:
+                        logger.debug('No auth users found when generating tests')
     metafunc.parametrize(argnames, argvalues, ids=idlist)
 
 
