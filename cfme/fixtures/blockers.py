@@ -34,15 +34,7 @@ def blockers(uses_blockers, meta):
     Returns:
         List of :py:class:`utils.blockers.Blocker` instances.
     """
-    result = []
-    for blocker in meta.get("blockers", []):
-        if isinstance(blocker, int):
-            result.append(Blocker.parse("BZ#{}".format(blocker)))
-        elif isinstance(blocker, Blocker):
-            result.append(blocker)
-        else:
-            result.append(Blocker.parse(blocker))
-    return result
+    return [Blocker.parse(blocker) for blocker in meta.get("blockers", [])]
 
 
 @pytest.fixture(scope="function")
@@ -56,46 +48,55 @@ def bug(blocker):
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup('Blockers options')
-    group.addoption('--list-blockers',
-                    action='store_true',
-                    default=False,
-                    dest='list_blockers',
-                    help='Specify to list the blockers (takes some time though).')
+    group = parser.getgroup('Blocker options')
+    group.addoption(
+        '--blocker-report',
+        default=None,
+        choices=['coverage', 'marked', 'active', 'closed'],
+        dest='blocker_report',
+        help='Generate a BZ report (yaml) of the given type.\n'
+             'Coverage reports on automates/coverage meta markers\n'
+             'Marked reports on all blockers marked on cases\n'
+             'Active reports on blockers marked on cases that are currently blocking\n'
+             'Closed reports on blockers that have been closed'
+    )
 
 
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(session, config, items):
-    if not config.getvalue("list_blockers"):
+    """Generate a report of the blocker items (BZ's, GH, JIRA) and dump it to console
+
+    Automatically adds collect-only option
+    """
+    if not config.option.blocker_report:
         return
-    store.terminalreporter.write("Loading blockers ...\n", bold=True)
+    if not config.option.collectonly:
+        config.option.collectonly = True
+
+    tr = store.terminalreporter
+
+    tr.write_line("Parsing testcases for blockers ...", bold=True)
     blocking = set([])
     for item in items:
-        if "blockers" not in item._metadata:
-            continue
-        for blocker in item._metadata["blockers"]:
-            if isinstance(blocker, int):
-                # TODO: DRY
-                blocker_object = Blocker.parse("BZ#{}".format(blocker))
-            else:
-                blocker_object = Blocker.parse(blocker)
+        for blocker in item._metadata.get("blockers", []):
+            blocker_object = Blocker.parse(blocker)
             if blocker_object.blocks:
                 blocking.add(blocker_object)
     if blocking:
-        store.terminalreporter.write("Known blockers:\n", bold=True)
+        tr.write_line("Marked blockers:", bold=True)
         for blocker in blocking:
             if isinstance(blocker, BZ):
                 bug = blocker.bugzilla_bug
-                store.terminalreporter.write("- #{} - {}\n".format(bug.id, bug.status))
-                store.terminalreporter.write("  {}\n".format(bug.summary))
-                store.terminalreporter.write(
-                    "  {} -> {}\n".format(str(bug.version), str(bug.target_release)))
-                store.terminalreporter.write(
-                    "  https://bugzilla.redhat.com/show_bug.cgi?id={}\n\n".format(bug.id))
+                tr = store.terminalreporter
+                tr.write_line(f"- #{bug.id} - {bug.status}")
+                tr.write_line(f"  {bug.summary}")
+                tr.write_line(f"  {bug.version} -> {bug.target_release}")
+                tr.write_line("  https://bugzilla.redhat.com/show_bug.cgi?id={bug.id}")
+                tr.write_line("")  # extra space
             elif isinstance(blocker, GH):
                 bug = blocker.data
-                store.terminalreporter.write("- {}\n".format(str(bug)))
-                store.terminalreporter.write("  {}\n".format(bug.title))
+                tr.write_line(f"- {bug}")
+                tr.write_line(f"  {bug.title}")
             else:
                 store.terminalreporter.write("- {}\n".format(str(blocker.data)))
     else:

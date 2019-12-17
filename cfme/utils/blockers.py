@@ -45,10 +45,17 @@ class Blocker(object):
 
     @classmethod
     def parse(cls, blocker, **kwargs):
-        """Create a blocker object from some representation"""
+        """Create a blocker object from some representation
+
+        Notes:
+            This assumes any integer blocker is a BZ
+        """
         if isinstance(blocker, cls):
             return blocker
-        elif isinstance(blocker, str):
+        elif isinstance(blocker, int):
+            blocker = f"BZ#{blocker}"  # mangle it so the below block can be consistent
+
+        if isinstance(blocker, str):
             if "#" in blocker:
                 # Generic blocker
                 engine, spec = blocker.split("#", 1)

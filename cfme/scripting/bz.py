@@ -54,7 +54,7 @@ def get_report(directory):
         "--dummy-appliance",
         "--include-manual",
         "-q",
-        "--generate-bz-report", directory
+        "--generate-coverage-report", directory
     ])
     # read the generated yaml
     try:
@@ -98,6 +98,9 @@ def get_qe_test_coverage(info, bz_status):
             bz_list.append(BZTestCoverage(id=bug_id, qe_test_coverage=qe_test_coverage))
 
     return bz_list
+
+def get_qe_test_blockers(info, bz_status):
+
 
 
 def cleanup():

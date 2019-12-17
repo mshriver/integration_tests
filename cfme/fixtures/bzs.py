@@ -12,18 +12,18 @@ from cfme.utils.blockers import BZ
 def pytest_addoption(parser):
     group = parser.getgroup('Blocker options')
     group.addoption(
-        '--generate-bz-report',
+        '--generate-coverage-report',
         action='store_true',
         default=False,
-        dest='generate_bz_report',
+        dest='generate_coverage_report',
         help='Generate a BZ report based on the automates/coverage metadata of test cases.'
     )
 
 
 def pytest_collection_modifyitems(session, config, items):
-    if not config.getvalue("generate_bz_report"):
+    if not config.getvalue("generate_coverage_report"):
         return
-    store.terminalreporter.write("Loading automated/covered BZs ...\n", bold=True)
+    store.terminalreporter.write("Loading automated/covered/blocked BZs ...\n", bold=True)
     bz_list = []
     for item in items:
         if "automates" not in item._metadata and "coverage" not in item._metadata:
