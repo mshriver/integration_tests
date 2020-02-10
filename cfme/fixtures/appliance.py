@@ -50,6 +50,12 @@ def sprout_appliances(
     # basically, let stream/version work independently, and only default if neither are set
     req_version = version or (appliance.version.vstring if not stream else None)
     req_stream = stream or (appliance.version.stream() if not version else None)
+
+    # upstream version comes back as master, not a dated build
+    # Let sprout pick the latest version for the stream only
+    if 'upstream' in req_stream and req_version == 'master':
+        req_version = None
+
     apps, request_id = sprout_client.provision_appliances(
         provider_type=provider_type,
         count=count,
